@@ -42,29 +42,42 @@ export const deleteTopic = (id: string) =>
 export const updateNotes = (topicId: string, notes: string) =>
   apiFetch(`/topics/${topicId}/notes`, { method: 'PUT', body: JSON.stringify({ notes }) })
 
-export const uploadFile = async (topicId: string, file: File) => {
-  const form = new FormData()
-  form.append('file', file)
+export const uploadFile = async (topicId: string, file: File): Promise<{ extractedText: string }> => {
   const token = localStorage.getItem('study_buddy_token')
+  const formData = new FormData()
+  formData.append('file', file)
+
   const res = await fetch(`/api/topics/${topicId}/upload`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
+    // DO NOT set Content-Type — browser sets it automatically with boundary
+    body: formData,
   })
-  if (!res.ok) throw await res.json()
+
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err?.error || err?.message || 'Upload failed')
+  }
+
   return res.json()
 }
 
-export const uploadImage = async (topicId: string, file: File) => {
-  const form = new FormData()
-  form.append('file', file)
+export const uploadImage = async (topicId: string, file: File): Promise<{ extractedText: string }> => {
   const token = localStorage.getItem('study_buddy_token')
+  const formData = new FormData()
+  formData.append('file', file)
+
   const res = await fetch(`/api/topics/${topicId}/upload-image`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
+    body: formData,
   })
-  if (!res.ok) throw await res.json()
+
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err?.error || err?.message || 'Upload failed')
+  }
+
   return res.json()
 }
 

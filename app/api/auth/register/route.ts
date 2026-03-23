@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "../../../../lib/db";
 import User from "../../../../models/User";
 import bcrypt from "bcryptjs";
+import { signToken } from "../../../../lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,8 +34,10 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
     });
 
+    const token = signToken({ id: newUser._id.toString(), email: newUser.email });
+
     return NextResponse.json(
-      { success: true, data: { id: newUser._id, email: newUser.email, name: newUser.name } },
+      { success: true, token, user: { id: newUser._id, email: newUser.email, name: newUser.name } },
       { status: 201 }
     );
   } catch (error: any) {

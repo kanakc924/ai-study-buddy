@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         token,
-        data: { id: user._id, email: user.email, name: user.name },
+        user: { id: user._id, email: user.email, name: user.name },
       },
       { status: 200 }
     );

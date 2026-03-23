@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, Playfair_Display, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
-import { AuthProvider } from '@/context/auth-context'
+import { AuthProvider } from '@/context/AuthContext'
 import { ThemeProvider } from 'next-themes'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' })

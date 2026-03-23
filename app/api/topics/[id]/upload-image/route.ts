@@ -5,7 +5,7 @@ import { withAuth, AuthenticatedRequest } from "../../../../../lib/middleware";
 import { extractTextFromImage } from "../../../../../services/ai.service";
 import { uploadImageToCloudinary } from "../../../../../services/cloudinary.service";
 
-async function uploadImage(req: AuthenticatedRequest, context: { params: { id: string } }) {
+async function uploadImage(req: AuthenticatedRequest, context: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
     const userId = req.user.id;

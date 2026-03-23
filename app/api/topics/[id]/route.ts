@@ -1,88 +1,81 @@
-import { NextResponse } from "next/server";
-import connectDB from "../../../../lib/db";
-import Topic from "../../../../models/Topic";
-import { withAuth, AuthenticatedRequest } from "../../../../lib/middleware";
+import { NextRequest, NextResponse } from 'next/server'
+import connectDB from '@/lib/db'
+import { extractTextFromPdf } from '@/services/pdf.service'
+import Topic from '@/models/Topic'
+import { verifyToken } from '@/lib/auth'
 
-async function updateTopic(req: AuthenticatedRequest, context: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    await connectDB();
-    const userId = req.user.id;
-    const { id } = await context.params;
-    const body = await req.json();
-
-    const topic = await Topic.findOneAndUpdate(
-      { _id: id, userId },
-      { $set: body },
-      { new: true, runValidators: true }
-    );
-
-    if (!topic) {
-      return NextResponse.json(
-        { success: false, error: { message: "Topic not found", code: "NOT_FOUND" } },
-        { status: 404 }
-      );
+    // Auth check
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const token = authHeader.split(' ')[1]
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    return NextResponse.json({ success: true, data: topic });
-  } catch (error: any) {
-    console.error("Update Topic Error:", error);
-    return NextResponse.json(
-      { success: false, error: { message: "Internal Server Error", code: "INTERNAL_ERROR" } },
-      { status: 500 }
-    );
-  }
-}
+    // Parse the uploaded file
+    const formData = await req.formData()
+    const file = formData.get('file') as File | null
 
-async function deleteTopic(req: AuthenticatedRequest, context: { params: { id: string } }) {
-  try {
-    await connectDB();
-    const userId = req.user.id;
-    const { id } = await context.params;
-
-    const topic = await Topic.findOneAndDelete({ _id: id, userId });
-
-    if (!topic) {
-      return NextResponse.json(
-        { success: false, error: { message: "Topic not found", code: "NOT_FOUND" } },
-        { status: 404 }
-      );
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, data: {} });
-  } catch (error: any) {
-    console.error("Delete Topic Error:", error);
-    return NextResponse.json(
-      { success: false, error: { message: "Internal Server Error", code: "INTERNAL_ERROR" } },
-      { status: 500 }
-    );
-  }
-}
+    // Validate file type
+    const isPDF = file.type === 'application/pdf'
+    const isTxt = file.type === 'text/plain'
 
-async function getTopic(req: AuthenticatedRequest, context: { params: { id: string } }) {
-  try {
-    await connectDB();
-    const userId = req.user.id;
-    const { id } = await context.params;
-
-    const topic = await Topic.findOne({ _id: id, userId }).populate("subjectId");
-
-    if (!topic) {
+    if (!isPDF && !isTxt) {
       return NextResponse.json(
-        { success: false, error: { message: "Topic not found", code: "NOT_FOUND" } },
-        { status: 404 }
-      );
+        { error: 'Only PDF and TXT files are supported' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ success: true, data: topic });
+    // Convert file to buffer
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    // Extract text
+    let extractedText = ''
+    if (isPDF) {
+      extractedText = await extractTextFromPdf(buffer)
+    } else {
+      // Plain text file — just decode it
+      extractedText = new TextDecoder().decode(buffer)
+    }
+
+    // Connect DB and verify topic belongs to user
+    await connectDB()
+    const topic = await Topic.findOne({
+      _id: params.id,
+      userId: decoded.id,
+    })
+
+    if (!topic) {
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 })
+    }
+
+    // Return extracted text — don't auto-save, let user review first
+    return NextResponse.json({
+      success: true,
+      extractedText,
+      fileName: file.name,
+      pageCount: isPDF ? undefined : null,
+    })
+
   } catch (error: any) {
-    console.error("Get Topic Error:", error);
+    console.error('Upload error:', error)
     return NextResponse.json(
-      { success: false, error: { message: "Internal Server Error", code: "INTERNAL_ERROR" } },
+      { error: error.message || 'Upload failed' },
       { status: 500 }
-    );
+    )
   }
 }
-
-export const GET = withAuth(getTopic);
-export const PUT = withAuth(updateTopic);
-export const DELETE = withAuth(deleteTopic);

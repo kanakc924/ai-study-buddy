@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Brain, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useAuth } from '@/context/auth-context'
+import { useAuth } from '@/context/AuthContext'
 import { loginUser } from '@/services/api'
 
 export default function LoginPage() {
@@ -30,7 +30,7 @@ export default function LoginPage() {
       login(token, user)
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err?.error || err?.message || 'Invalid credentials')
+      setError(err?.error?.message || err?.message || 'Invalid credentials')
     } finally {
       setLoading(false)
     }

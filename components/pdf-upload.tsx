@@ -1,95 +1,135 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Upload, FileText, Loader2, X } from 'lucide-react'
-import { uploadFile } from '@/services/api'
+import { useRef, useState } from 'react'
+import { FileText, UploadCloud, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-export function PdfUpload({ topicId, onExtracted }: { topicId: string, onExtracted: (text: string) => void }) {
-  const [isDragging, setIsDragging] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
+interface PdfUploadProps {
+  topicId: string
+  onExtracted: (text: string) => void
+}
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile?.type === 'application/pdf' || droppedFile?.type === 'text/plain') {
-      await processFile(droppedFile)
-    } else {
-      toast.error('Only PDF or TXT files are supported')
+export function PdfUpload({ topicId, onExtracted }: PdfUploadProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [dragActive, setDragActive] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [fileName, setFileName] = useState('')
+
+  const handleUpload = async (file: File) => {
+    // Validate file type
+    const isPDF = file.type === 'application/pdf'
+    const isTxt = file.type === 'text/plain'
+    if (!isPDF && !isTxt) {
+      toast.error('Only PDF and TXT files are supported')
+      return
     }
-  }, [topicId])
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (selected) await processFile(selected)
-  }
+    setFileName(file.name)
+    setLoading(true)
 
-  const processFile = async (selectedFile: File) => {
-    setFile(selectedFile)
-    setIsUploading(true)
     try {
-      const res = await uploadFile(topicId, selectedFile)
-      toast.success('File processed successfully')
-      if (res.extractedText || res.text) {
-        onExtracted(res.extractedText || res.text)
+      const token = localStorage.getItem('study_buddy_token')
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(`/api/topics/${topicId}/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err?.error || 'Upload failed')
       }
+
+      const data = await res.json()
+
+      if (!data.extractedText) {
+        throw new Error('No text could be extracted')
+      }
+
+      onExtracted(data.extractedText)
+      toast.success(`Extracted text from ${file.name}`)
     } catch (err: any) {
       toast.error(err.message || 'Failed to process file')
-      setFile(null)
+      setFileName('')
     } finally {
-      setIsUploading(false)
-      // Reset after a bit
-      setTimeout(() => setFile(null), 2000)
+      setLoading(false)
     }
+  }
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true)
+    else if (e.type === 'dragleave') setDragActive(false)
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (e.dataTransfer.files?.[0]) await handleUpload(e.dataTransfer.files[0])
+  }
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) await handleUpload(e.target.files[0])
   }
 
   return (
-    <div 
-      className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-        isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-card/50'
-      }`}
-      onDragEnter={() => setIsDragging(true)}
-      onDragLeave={() => setIsDragging(false)}
-      onDragOver={e => e.preventDefault()}
+    <div
+      className={`relative w-full p-8 border-2 border-dashed rounded-xl text-center transition-all cursor-pointer
+        ${dragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary hover:bg-card'}
+        ${loading ? 'opacity-60 pointer-events-none' : ''}
+      `}
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
       onDrop={handleDrop}
-      onClick={() => document.getElementById('pdf-upload-input')?.click()}
+      onClick={() => fileInputRef.current?.click()}
     >
-      <input 
-        id="pdf-upload-input" 
-        type="file" 
-        accept=".pdf,.txt" 
-        className="hidden" 
-        onChange={handleFileSelect}
-        disabled={isUploading}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,text/plain"
+        onChange={handleChange}
+        className="hidden"
       />
-      
-      <div className="flex flex-col items-center justify-center gap-3">
-        {isUploading ? (
-          <>
-            <div className="bg-primary/20 p-4 rounded-full animate-pulse">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            </div>
-            <p className="font-serif text-lg text-foreground">Processing {file?.name}...</p>
-            <p className="text-sm text-muted-foreground">Extracting text, this might take a moment.</p>
-          </>
-        ) : file ? (
-          <>
-            <div className="bg-[#4CAF50]/15 border border-[#4CAF50]/30 p-4 rounded-full">
-              <FileText className="w-8 h-8 text-[#4CAF50]" />
-            </div>
-            <p className="font-serif text-lg text-foreground">Done!</p>
-            <p className="text-sm text-muted-foreground">{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</p>
-          </>
+
+      <div className="flex flex-col items-center gap-3">
+        <div className="p-3 bg-primary/10 rounded-full">
+          {loading
+            ? <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            : <FileText className="w-6 h-6 text-primary" />
+          }
+        </div>
+
+        {loading ? (
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Extracting text from {fileName}...
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              This may take a moment
+            </p>
+          </div>
+        ) : fileName ? (
+          <div>
+            <p className="text-sm font-medium text-foreground">{fileName}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click to upload a different file
+            </p>
+          </div>
         ) : (
-          <>
-            <div className="bg-primary/10 border border-primary/20 p-4 rounded-full group-hover:scale-110 transition-transform">
-              <Upload className="w-8 h-8 text-primary" />
-            </div>
-            <p className="font-serif text-lg text-foreground">Drag & drop your notes</p>
-            <p className="text-sm text-muted-foreground">Supports PDF and TXT files. Or click to browse.</p>
-          </>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Click or drag PDF / TXT to upload
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Text will be extracted and shown for review
+            </p>
+          </div>
         )}
       </div>
     </div>

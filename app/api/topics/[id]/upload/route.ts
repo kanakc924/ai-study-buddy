@@ -4,7 +4,7 @@ import Topic from "../../../../../models/Topic";
 import { withAuth, AuthenticatedRequest } from "../../../../../lib/middleware";
 import { extractTextFromPdf } from "../../../../../services/pdf.service";
 
-async function uploadFile(req: AuthenticatedRequest, context: { params: { id: string } }) {
+async function uploadFile(req: AuthenticatedRequest, context: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
     const userId = req.user.id;
@@ -40,7 +40,7 @@ async function uploadFile(req: AuthenticatedRequest, context: { params: { id: st
     }
 
     // Return the extracted text to be previewed on the frontend
-    return NextResponse.json({ success: true, text: extractedText });
+    return NextResponse.json({ success: true, extractedText });
   } catch (error: any) {
     console.error("Upload File Error:", error);
     return NextResponse.json(

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Brain, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useAuth } from '@/context/auth-context'
+import { useAuth } from '@/context/AuthContext'
 import { registerUser } from '@/services/api'
 
 export default function RegisterPage() {
@@ -36,7 +36,7 @@ export default function RegisterPage() {
       login(token, user)
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err?.error || err?.message || 'Registration failed')
+      setError(err?.error?.message || err?.message || 'Registration failed')
     } finally {
       setLoading(false)
     }

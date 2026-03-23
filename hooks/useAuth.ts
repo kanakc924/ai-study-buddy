@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { loginUser, registerUser } from "../services/api";
-import { useAuth as useGlobalAuth } from "../context/auth-context";
+import { useAuth as useGlobalAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 
 export function useAuth() {

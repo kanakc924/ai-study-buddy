@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, Brain, Target, Flame, AlertTriangle, ArrowRight } from 'lucide-react'
-import { useAuth } from '@/context/auth-context'
+import { useAuth } from '@/context/AuthContext'
 import { getProgress } from '@/services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
